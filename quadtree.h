@@ -12,6 +12,7 @@ class quadtree_t
     quadtree_t *_find_child(int x, int y);
 public:
     quadtree_t(int xl, int xr, int yl, int yr);
+    quadtree_t(const char *boundary_filename);
     ~quadtree_t();
 
     void split(int x, int y, int range = 1);

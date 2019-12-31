@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstdio>
 #include <algorithm>
 #include "quadtree.h"
 #include "image.h"
@@ -88,6 +89,8 @@ void quadtree_t::split(int x, int y, int range)
 
 void quadtree_t::dump_to(const char *filename, int width, int height)
 {
+	if(width == 0) width = range;
+	if(height == 0) height = range;
 	image_t img(width, height);
 	traverse([&](int xl, int xr, int yl, int yr) {
 		xr = std::min(xr, height - 1);
@@ -99,4 +102,33 @@ void quadtree_t::dump_to(const char *filename, int width, int height)
 	} );
 
 	img.write(filename);
+}
+
+quadtree_t::quadtree_t(const char* boundary_filename)
+{
+	auto get_2pow = [](int x) {
+		int p = 1;
+		while(p < x) p <<= 1;
+		return p;
+	};
+
+	// initialize
+	image_t img(boundary_filename);
+	int w = img.w, h = img.h;
+	xl = yl = 0;
+	range = xr = yr = std::max(get_2pow(h), get_2pow(w));
+	s_ll = s_lr = s_rl = s_rr = nullptr;
+
+	// split
+	for(int i = 0; i < w; ++i)
+		split(h, i, 1);
+	for(int i = 0; i < h; ++i)
+		split(i, w, 1);
+
+	for(int i = 0; i < h; ++i)
+		for(int j = 0; j < w; ++j)
+		{
+			if(img.get(i, j, 0) < 128)
+				split(i, j, 1);
+		}
 }
