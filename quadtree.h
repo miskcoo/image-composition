@@ -3,6 +3,7 @@
 
 class quadtree_t
 {
+	friend class image_compositor;
     int range;
     int xl, xr, yl, yr;
     quadtree_t *s_ll, *s_lr, *s_rl, *s_rr;
@@ -17,8 +18,12 @@ public:
 
     void split(int x, int y, int range = 1);
     quadtree_t *find(int x, int y);
+    quadtree_t *find_outer(int x, int y);
 	bool in_range(int x, int y);
-    bool is_leaf() const;
+    bool is_leaf();
+	bool is_keypoint(int x, int y);
+	void fill_boundary(int x[4], int y[4]);
+	int get_range() { return range; }
 
 	void dump_to(const char* filename, int width, int height);
 

@@ -22,7 +22,7 @@ quadtree_t::~quadtree_t()
 	}
 }
 
-bool quadtree_t::is_leaf() const
+bool quadtree_t::is_leaf()
 {
     return s_ll == nullptr;
 }
@@ -38,6 +38,34 @@ quadtree_t *quadtree_t::find(int x, int y)
 		return nullptr;
 	if(is_leaf()) return this;
 	return _find_child(x, y)->find(x, y);
+}
+
+bool quadtree_t::is_keypoint(int x, int y)
+{
+	if(x == 0 || y == 0)
+		return true;
+	quadtree_t *node = find(x, y);
+	if(node->xl == x && node->yl == y)
+	{
+		quadtree_t *outer = find_outer(x, y);
+		if(outer == nullptr) return false;
+		else return outer->xr == x && outer->yr == y;
+	} else return false;
+}
+
+quadtree_t* quadtree_t::find_outer(int x, int y)
+{
+	if(is_leaf())
+		return this;
+
+	if(xl <= x && x <= xr && yl <= y && y <= yr)
+	{
+		int xm = (xl + xr) >> 1, ym = (yl + yr) >> 1;
+		quadtree_t *s;
+		if(x <= xm) s = y <= ym ? s_ll : s_lr;
+		else s = y <= ym ? s_rl : s_rr;
+		return s->find_outer(x, y);
+	} else return nullptr;
 }
 
 quadtree_t *quadtree_t::_find_child(int x, int y)
@@ -101,6 +129,13 @@ void quadtree_t::dump_to(const char *filename, int width, int height)
 				img.set_rgb(i, j, color);
 	} );
 
+//	for(int i = 0; i < height; ++i)
+//		for(int j = 0; j < width; ++j)
+//			if(is_keypoint(i, j))
+//				for(int s = -1; s <= 50; ++s)
+//					for(int t = -1; t <= 50; ++t)
+//						img.set_rgb(i + s, j + t, 0);
+
 	img.write(filename);
 }
 
@@ -121,9 +156,9 @@ quadtree_t::quadtree_t(const char* boundary_filename)
 
 	// split
 	for(int i = 0; i < w; ++i)
-		split(h, i, 1);
+		split(h - 1, i, 1);
 	for(int i = 0; i < h; ++i)
-		split(i, w, 1);
+		split(i, w - 1, 1);
 
 	for(int i = 0; i < h; ++i)
 		for(int j = 0; j < w; ++j)
@@ -131,4 +166,12 @@ quadtree_t::quadtree_t(const char* boundary_filename)
 			if(img.get(i, j, 0) < 128)
 				split(i, j, 1);
 		}
+}
+
+void quadtree_t::fill_boundary(int x[4], int y[4])
+{
+	x[0] = xl, y[0] = yl;
+	x[1] = xl, y[1] = yr;
+	x[2] = xr, y[2] = yl;
+	x[3] = xr, y[3] = yr;
 }

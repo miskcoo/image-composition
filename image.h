@@ -1,11 +1,8 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "tools/stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "tools/stb_image_write.h"
-
+#include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -44,29 +41,20 @@ public:
 		double r = get(fx, cy, c) * (1.0 - dx) + get(cx, cy, c) * dx;
 		return l * (1.0 - dy) + r * dy;
 	}
-	
-	void write(const char* filename)
-	{
-		stbi_write_png(filename, w, h, c, buf, 0);
-	}
 
+	void write(const char* filename);
 public:
-	image_t(const char* filename)
-	{
-		uint8_t *stbi_buf = stbi_load(filename, &w, &h, &c, 0);
-		buf = new uint8_t[w * h * c];
-		std::memcpy(buf, stbi_buf, w * h * c);
-		stbi_image_free(stbi_buf);
-		std::printf("Load image %s: %dx%dx%d\n", filename, w, h, c);
-	}
-
+	image_t(const char* filename);
 	image_t(int w, int h, int c = 3)
 	{
 		this->w = w;
 		this->h = h;
 		this->c = c;
 		buf = new uint8_t[w * h * c];
+		std::memset(buf, 0, w * h * c);
 	}
+
+	image_t(const image_t&) = delete;
 
 	~image_t()
 	{
