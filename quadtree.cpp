@@ -42,24 +42,21 @@ quadtree_t *quadtree_t::find(int x, int y)
 
 bool quadtree_t::is_keypoint(int x, int y)
 {
-	if(x == 0 || y == 0)
-		return true;
 	quadtree_t *node = find(x, y);
-	if(node->xl == x && node->yl == y)
+	if(node && node->xl == x && node->yl == y)
 	{
 		quadtree_t *outer = find_outer(x, y);
 		if(outer == nullptr) return false;
-		else return outer->xr == x && outer->yr == y;
+		else return outer->xr == x && outer->yr == y || x == 0 || y == 0;
 	} else return false;
 }
 
 quadtree_t* quadtree_t::find_outer(int x, int y)
 {
-	if(is_leaf())
-		return this;
-
 	if(xl <= x && x <= xr && yl <= y && y <= yr)
 	{
+		if(is_leaf())
+			return this;
 		int xm = (xl + xr) >> 1, ym = (yl + yr) >> 1;
 		quadtree_t *s;
 		if(x <= xm) s = y <= ym ? s_ll : s_lr;
@@ -113,6 +110,8 @@ void quadtree_t::_split_tree(quadtree_t *root, int x, int y, int range)
 void quadtree_t::split(int x, int y, int range)
 {
 	_split_tree(this, x, y, range);
+	if(x > xl && y > yl)
+		_split_tree(this, x - 1, y - 1, range);
 }
 
 void quadtree_t::dump_to(const char *filename, int width, int height)
@@ -129,12 +128,14 @@ void quadtree_t::dump_to(const char *filename, int width, int height)
 				img.set_rgb(i, j, color);
 	} );
 
-//	for(int i = 0; i < height; ++i)
-//		for(int j = 0; j < width; ++j)
-//			if(is_keypoint(i, j))
-//				for(int s = -1; s <= 50; ++s)
-//					for(int t = -1; t <= 50; ++t)
-//						img.set_rgb(i + s, j + t, 0);
+#ifdef DUMP_KEYPOINTS
+	for(int i = 0; i < height; ++i)
+		for(int j = 0; j < width; ++j)
+			if(is_keypoint(i, j))
+				for(int s = 0; s <= 0; ++s)
+					for(int t = 0; t <= 0; ++t)
+						img.set_rgb(i + s, j + t, 0);
+#endif
 
 	img.write(filename);
 }

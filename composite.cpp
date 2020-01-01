@@ -2,8 +2,8 @@
 #include "layer.h"
 #include "quadtree.h"
 #include "image.h"
-#include <eigen3/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h>
-#include <eigen3/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h>
+#include <cassert>
+#include <eigen3/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h>
 #include <memory>
 #include <cmath>
 
@@ -82,6 +82,82 @@ uint8_t image_compositor::get_color(int x, int y, int ch, int ignore_z)
 	return 255;
 }
 
+void image_compositor::apply_gradient_matrix(const std::vector<interp_line_t>& S, const std::vector<double> B[3], int size)
+{
+	std::puts("  Computing sparse matrix StS...");
+	StS = std::make_shared<Eigen::SparseMatrix<double>>(size, size);
+	StS->setZero();
+	for(auto &line : S)
+	{
+		for(auto mv1 : line)
+			for(auto mv2 : line)
+				StS->coeffRef(mv1.first, mv2.first) += mv1.second * mv2.second;
+	}
+	StS->makeCompressed();
+
+	std::puts("  Computing sparse vectors StB...");
+	for(int ch = 0; ch < 3; ++ch)
+	{
+		StB[ch] = std::make_shared<Eigen::SparseVector<double>>(size);
+		StB[ch]->setZero();
+		for(int i = 0; i < (int)S.size(); ++i)
+			for(auto mv : S[i])
+				StB[ch]->coeffRef(mv.first) += mv.second * B[ch][i];
+	}
+}
+
+void image_compositor::build_full_matrices()
+{
+	std::puts("  Building matrix S and vector B...");
+	std::vector<std::vector<mv_t>> S;
+	std::vector<double> B[3];
+	for(int i = 0; i < height; ++i)
+	{
+		for(int j = 0; j < width; ++j)
+		{
+			for(int axis = 0; axis < 2; ++axis)
+			{
+				int ti = i - axis, tj = j - (1 - axis);
+				if(ti < 0 || tj < 0) continue;
+
+				// interpolation matrix
+				std::vector<mv_t> line;
+				line.push_back( mv_t(i * width + j, 1.0) );
+				line.push_back( mv_t(ti * width + tj, -1.0) );
+				S.emplace_back(std::move(line));
+
+				// B vector
+				int z = z_index->get(i, j, 0);
+				int z_t = z_index->get(ti, tj, 0);
+				if(z != z_t)
+				{
+					int z_m = std::max(z, z_t) - 1;
+					for(int ch = 0; ch < 3; ++ch)
+					{
+						int g0 = img_mixed->get(i, j, ch) - img_mixed->get(ti, tj, ch);
+						int g1 = get_color(i, j, ch, z_m) - get_color(ti, tj, ch, z_m);
+						B[ch].push_back(g1 - g0);
+					}
+				} else {
+					for(int ch = 0; ch < 3; ++ch)
+						B[ch].push_back(0.0);
+				}
+			}
+		}
+	}
+
+	std::vector<mv_t> last_line;
+	last_line.push_back( { width * height - 1, 1.0 } );
+	S.push_back(last_line);
+	for(int ch = 0; ch < 3; ++ch)
+	{
+		B[ch].push_back(0.0);
+		assert(B[ch].size() == S.size());
+	}
+
+	apply_gradient_matrix(S, B, height * width);
+}
+
 void image_compositor::build_matrices()
 {
 	/* (1) build interpolation matrix */
@@ -133,32 +209,14 @@ void image_compositor::build_matrices()
 		}
 	}
 
-	for(int ch = 0; ch < 3; ++ch)
-		B[ch].push_back(0.0);
 	S.push_back(interp[height * width - 1]);
-
-	/* (2) compute StS */
-	std::puts("  Computing sparse matrix StS...");
-	int size = keypoints.size();
-	StS = std::make_shared<Eigen::SparseMatrix<double>>(size, size);
-	StS->setZero();
-	for(auto &line : S)
-	{
-		for(auto mv1 : line)
-			for(auto mv2 : line)
-				StS->coeffRef(mv1.first, mv2.first) += mv1.second * mv2.second;
-	}
-	StS->makeCompressed();
-
-	/* (3) compute StB */
-	std::puts("  Computing sparse vectors StB...");
 	for(int ch = 0; ch < 3; ++ch)
 	{
-		StB[ch] = std::make_shared<Eigen::SparseVector<double>>(size);
-		for(int i = 0; i < (int)S.size(); ++i)
-			for(auto mv : S[i])
-				StB[ch]->coeffRef(mv.first) += mv.second * B[ch][i];
+		B[ch].push_back(0.0);
+		assert(B[ch].size() == S.size());
 	}
+
+	apply_gradient_matrix(S, B, keypoints.size());
 }
 
 image_compositor::interp_line_t image_compositor::build_interp_line(int x, int y)
@@ -225,24 +283,30 @@ image_compositor::interp_line_t image_compositor::build_interp_line(int x, int y
 	return line;
 }
 
-void image_compositor::run()
+void image_compositor::run(bool full_keypoings)
 {
 	std::puts("Building mixed image...");
 	build_mixed_image();
-	std::puts("Calculating boundary...");
-	build_boundary();
+	if(!full_keypoings)
+	{
+		std::puts("Calculating boundary...");
+		build_boundary();
+	}
+
 	std::puts("Calculating matrices...");
-	build_matrices();
+	if(full_keypoings) build_full_matrices();
+	else build_matrices();
 
 	std::puts("Initializing solver...");
-	Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IdentityPreconditioner> solver;
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
 	solver.compute(*StS);
 	img_result = std::make_shared<image_t>(width, height, 3);
 
 	for(int ch = 0; ch < 3; ++ch)
 	{
 		std::printf("Calculating channel %d...\n", ch + 1);
-		std::vector<double> x(keypoints.size(), 0.0);
+		int size = full_keypoings ? height * width : keypoints.size();
+		std::vector<double> x(size, 0.0);
 		Eigen::SparseVector<double> ans = solver.solve(*StB[ch]);
 		for(Eigen::SparseVector<double>::InnerIterator it(ans); it; ++it)
 			x[it.index()] = it.value();
@@ -254,8 +318,13 @@ void image_compositor::run()
 			for(int j = 0; j < width; ++j)
 			{
 				double val = 0.0;
-				for(mv_t mv : interp[i * width + j])
-					val += x[mv.first] * mv.second;
+				if(full_keypoings)
+				{
+					val = x[i * width + j];
+				} else {
+					for(mv_t mv : interp[i * width + j])
+						val += x[mv.first] * mv.second;
+				}
 				delta[i * width + j] = val;
 				mean += val;
 			}
