@@ -168,11 +168,3 @@ quadtree_t::quadtree_t(const char* boundary_filename)
 				split(i, j, 1);
 		}
 }
-
-void quadtree_t::fill_boundary(int x[4], int y[4])
-{
-	x[0] = xl, y[0] = yl;
-	x[1] = xl, y[1] = yr;
-	x[2] = xr, y[2] = yl;
-	x[3] = xr, y[3] = yr;
-}

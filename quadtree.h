@@ -22,7 +22,6 @@ public:
 	bool in_range(int x, int y);
     bool is_leaf();
 	bool is_keypoint(int x, int y);
-	void fill_boundary(int x[4], int y[4]);
 	int get_range() { return range; }
 
 	void dump_to(const char* filename, int width, int height);

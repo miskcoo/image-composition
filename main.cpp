@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
 	compositor->set_image_size(418, 356);
 	compositor->run();
 	compositor->save_mixed_image("images/hand-eye/mixed.png");
+	compositor->save_delta_image("images/hand-eye/delta.png");
 	compositor->save_quadtree("images/hand-eye/quadtree.png");
 	compositor->save_image("images/hand-eye/result.png");
 	return 0;

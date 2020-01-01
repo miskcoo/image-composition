@@ -8,6 +8,7 @@
 void image_t::write(const char* filename)
 {
 	stbi_write_png(filename, w, h, c, buf, 0);
+	std::printf("Save image %s: %dx%dx%d\n", filename, w, h, c);
 }
 
 image_t::image_t(const char* filename)

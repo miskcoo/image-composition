@@ -42,6 +42,7 @@ public:
 	void save_quadtree(const char *path);
 	void save_image(const char *path);
 	void save_mixed_image(const char *path);
+	void save_delta_image(const char *path);
 	void set_image_size(int w, int h);
 	void add_layer(const char *image, const char *mask, int offset_x = 0, int offset_y = 0);
 };

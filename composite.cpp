@@ -229,22 +229,31 @@ image_compositor::interp_line_t image_compositor::build_interp_line(int x, int y
 		return line;
 	}
 
-	int X[4], Y[4];
 	std::unordered_map<int, double> weight;
 
 	quadtree_t *node = qtree->find(x, y);
-	node->fill_boundary(X, Y);
+
+	int X[4], Y[4];
+	double W[4];
 	double area = node->get_range() * node->get_range();
+	X[0] = node->xl; Y[0] = node->yl;
+	W[0] = (node->xr - x) * (node->yr - y) / area;
+	X[1] = node->xl; Y[1] = node->yr;
+	W[1] = (node->xr - x) * (y - node->yl) / area;
+	X[2] = node->xr; Y[2] = node->yl;
+	W[2] = (x - node->xl) * (node->yr - y) / area;
+	X[3] = node->xr; Y[3] = node->yr;
+	W[3] = (x - node->xl) * (y - node->yl) / area;
+
 	for(int i = 0; i < 4; ++i)
 	{
-		if(X[i] == x || Y[i] == y)
+		if(W[i] < 1.0e-5)
 			continue;
 
-		double w = std::abs((X[i] - x) * (Y[i] - y)) / area;
 		auto it = keypoints.find( { X[i], Y[i] } );
 		if(it != keypoints.end())
 		{
-			weight[it->second] += w;
+			weight[it->second] += W[i];
 		} else {
 			auto interp_edge = [&](quadtree_t *n) {
 				if(X[i] == n->xl || X[i] == n->xr)
@@ -254,8 +263,8 @@ image_compositor::interp_line_t image_compositor::build_interp_line(int x, int y
 					if(it_l != keypoints.end() && it_r != keypoints.end())
 					{
 						double len = n->yr - n->yl;
-						weight[it_l->second] += w * (Y[i] - n->yl) / len;
-						weight[it_r->second] += w * (n->yr - Y[i]) / len;
+						weight[it_r->second] += W[i] * (Y[i] - n->yl) / len;
+						weight[it_l->second] += W[i] * (n->yr - Y[i]) / len;
 					}
 				}
 
@@ -266,8 +275,8 @@ image_compositor::interp_line_t image_compositor::build_interp_line(int x, int y
 					if(it_l != keypoints.end() && it_r != keypoints.end())
 					{
 						double len = n->xr - n->xl;
-						weight[it_l->second] += w * (X[i] - n->xl) / len;
-						weight[it_r->second] += w * (n->xr - X[i]) / len;
+						weight[it_r->second] += W[i] * (X[i] - n->xl) / len;
+						weight[it_l->second] += W[i] * (n->xr - X[i]) / len;
 					}
 				}
 			};
@@ -357,6 +366,31 @@ void image_compositor::save_mixed_image(const char *path)
 void image_compositor::save_image(const char *path)
 {
 	img_result->write(path);
+}
+
+void image_compositor::save_delta_image(const char *path)
+{
+	image_t delta(width, height, 3);
+	for(int ch = 0; ch < 3; ++ch)
+	{
+		int min = 1000, max = -1000;
+		for(int i = 0; i < height; ++i)
+			for(int j = 0; j < width; ++j)
+			{
+				int d = img_result->get(i, j, ch) - img_mixed->get(i, j, ch);
+				min = std::min(d, min);
+				max = std::max(d, max);
+			}
+
+		for(int i = 0; i < height; ++i)
+			for(int j = 0; j < width; ++j)
+			{
+				int d = img_result->get(i, j, ch) - img_mixed->get(i, j, ch);
+				delta.get_ptr(i, j)[ch] = (d - min) * 255 / (max - min);
+			}
+	}
+
+	delta.write(path);
 }
 
 void image_compositor::set_image_size(int w, int h)
