@@ -6,9 +6,11 @@
 #include <eigen3/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h>
 #include <memory>
 #include <cmath>
+#include <unordered_map>
 
 void image_compositor::build_mixed_image()
 {
+	img_delta = std::make_shared<image_t>(width, height, 3);
 	img_mixed = std::make_shared<image_t>(width, height, 3);
 	z_index = std::make_shared<image_t>(width, height, 1);
 	for(int i = 0; i < (int)layers.size(); ++i)
@@ -85,14 +87,20 @@ uint8_t image_compositor::get_color(int x, int y, int ch, int ignore_z)
 void image_compositor::apply_gradient_matrix(const std::vector<interp_line_t>& S, const std::vector<double> B[3], int size)
 {
 	std::puts("  Computing sparse matrix StS...");
-	StS = std::make_shared<Eigen::SparseMatrix<double>>(size, size);
-	StS->setZero();
+	std::map<std::pair<int, int>, double> M;
 	for(auto &line : S)
 	{
 		for(auto mv1 : line)
 			for(auto mv2 : line)
-				StS->coeffRef(mv1.first, mv2.first) += mv1.second * mv2.second;
+				M[ std::make_pair(mv1.first, mv2.first) ] += mv1.second * mv2.second;
 	}
+
+	std::vector<Eigen::Triplet<double>> items;
+	for(auto it : M)
+		items.push_back( { it.first.first, it.first.second, it.second } );
+
+	StS = std::make_shared<Eigen::SparseMatrix<double>>(size, size);
+	StS->setFromTriplets(items.begin(), items.end());
 	StS->makeCompressed();
 
 	std::puts("  Computing sparse vectors StB...");
@@ -320,7 +328,7 @@ void image_compositor::run(bool full_keypoings)
 		for(Eigen::SparseVector<double>::InnerIterator it(ans); it; ++it)
 			x[it.index()] = it.value();
 
-		double mean = 0.0;
+		double mean = 0.0, max = -1.0e4, min = 1.0e4;
 		std::vector<double> delta(height * width, 0.0);
 		for(int i = 0; i < height; ++i)
 		{
@@ -336,6 +344,8 @@ void image_compositor::run(bool full_keypoings)
 				}
 				delta[i * width + j] = val;
 				mean += val;
+				max = std::max(max, val);
+				min = std::min(min, val);
 			}
 		}
 
@@ -345,9 +355,11 @@ void image_compositor::run(bool full_keypoings)
 		{
 			for(int j = 0; j < width; ++j)
 			{
-				int val = std::round(img_mixed->get(i, j, ch) + delta[i * width + j] - mean);
+				double d = delta[i * width + j];
+				int val = std::round(img_mixed->get(i, j, ch) + d - mean);
 				val = std::max(0, std::min(255, val));
 				img_result->get_ptr(i, j)[ch] = val;
+				img_delta->get_ptr(i, j)[ch] = (d - min) / (max - min) * 255;
 			}
 		}
 	}
@@ -370,32 +382,24 @@ void image_compositor::save_image(const char *path)
 
 void image_compositor::save_delta_image(const char *path)
 {
-	image_t delta(width, height, 3);
-	for(int ch = 0; ch < 3; ++ch)
-	{
-		int min = 1000, max = -1000;
-		for(int i = 0; i < height; ++i)
-			for(int j = 0; j < width; ++j)
-			{
-				int d = img_result->get(i, j, ch) - img_mixed->get(i, j, ch);
-				min = std::min(d, min);
-				max = std::max(d, max);
-			}
-
-		for(int i = 0; i < height; ++i)
-			for(int j = 0; j < width; ++j)
-			{
-				int d = img_result->get(i, j, ch) - img_mixed->get(i, j, ch);
-				delta.get_ptr(i, j)[ch] = (d - min) * 255 / (max - min);
-			}
-	}
-
-	delta.write(path);
+	img_delta->write(path);
 }
 
 void image_compositor::set_image_size(int w, int h)
 {
 	width = w, height = h;
+}
+
+void image_compositor::auto_image_size()
+{
+	width = height = 0;
+	for(auto layer : layers)
+	{
+		width = std::max(layer->get_right(), width);
+		height = std::max(layer->get_bottom(), height);
+	}
+
+	std::printf("Adjust image to %dx%d\n", width, height);
 }
 
 void image_compositor::add_layer(const char *image, const char *mask, int offset_x, int offset_y)

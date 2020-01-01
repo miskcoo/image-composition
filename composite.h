@@ -20,7 +20,7 @@ private:
 
 	int width, height;
 	std::shared_ptr<quadtree_t> qtree;
-	std::shared_ptr<image_t> img_mixed, z_index, img_result;
+	std::shared_ptr<image_t> img_mixed, z_index, img_result, img_delta;
 	std::vector<interp_line_t> interp;
 	std::map<point_t, int> keypoints;
 	std::shared_ptr<Eigen::SparseMatrix<double>> StS;
@@ -44,6 +44,7 @@ public:
 	void save_mixed_image(const char *path);
 	void save_delta_image(const char *path);
 	void set_image_size(int w, int h);
+	void auto_image_size();
 	void add_layer(const char *image, const char *mask, int offset_x = 0, int offset_y = 0);
 };
 

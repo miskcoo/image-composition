@@ -21,6 +21,16 @@ public:
 		offset_y = oy;
 	}
 
+	int get_right()
+	{
+		return offset_y + image->w;
+	}
+
+	int get_bottom()
+	{
+		return offset_x + image->h;
+	}
+
 	void load(const char *image_path, const char *mask_path)
 	{
 		image = std::make_shared<image_t>(image_path);
