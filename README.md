@@ -22,4 +22,27 @@ where `<directory>` is the directory of your images and masks. You need to creat
 <image path> <mask path> <offset_x> <offset_y>
 ```
 
-You can find an example in `examples`.
+You can find an example in `images/hand-eye`.
+
+## Example
+
+For example, if you want to composite the following two images:
+
+![](images/hand-eye/test2_src.png)![](images/hand-eye/test2_mask.png)
+
+![](images/hand-eye/test2_target.png)
+
+The configuration `layers.conf` is:
+
+```plain
+test2_target.png NULL 0 0
+test2_src.png test2_mask.png 160 140
+```
+
+The result image is
+
+![](images/hand-eye/result.png)
+
+and the corresponding quadtree and delta map are
+
+![](images/hand-eye/quadtree.png)![](images/hand-eye/delta.png)
