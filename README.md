@@ -46,3 +46,12 @@ The result image is
 and the corresponding quadtree and delta map are
 
 ![](images/hand-eye/quadtree.png)![](images/hand-eye/delta.png)
+
+## Reference
+
+[1] https://github.com/llylly/ImageCompositing
+
+[2] http://www.agarwala.org/efficient_gdc/
+
+[3] Agarwala, Aseem. "Efficient gradient-domain compositing using quadtrees." _ACM Transactions on Graphics (TOG)._ Vol. 26. No. 3. ACM, 2007.
+
