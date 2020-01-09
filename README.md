@@ -1,6 +1,6 @@
 # Image Composition
 
-The project of "Media Computing" of Tsinghua University, Fall 2019.
+The homework of "Media Computing" of Tsinghua University, Fall 2019.
 
 A C++ implementation of the following paper:
 
@@ -17,12 +17,12 @@ And then run by
 ```bash
 ./composite <directory>
 ```
-where `<directory>` is the directory of your images and masks. You need to create a configuration file `layers.conf` on `<directory>`. This configuration file contains multiple lines, each of which has 4 components separated by whitespace describing an image and its mask:
+You need to put your images and their masks into `<directory>`, and you also need to create a configuration file `layers.conf` on `<directory>`. The configuration file contains multiple lines, each of which has 4 components separated by whitespace describing an image and its mask:
 ```
 <image path> <mask path> <offset_x> <offset_y>
 ```
 
-You can find an example in `images/hand-eye`.
+An example can be found in `images/hand-eye`.
 
 ## Example
 
